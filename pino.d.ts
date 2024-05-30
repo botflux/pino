@@ -28,7 +28,7 @@ import type { WorkerOptions } from "worker_threads";
 type ThreadStream = any
 
 type TimeFn = () => string;
-type MixinFn = (mergeObject: object, level: number) => object;
+type MixinFn<CustomLevels extends string = never> = (mergeObject: object, level: number, logger:pino.Logger<CustomLevels>) => object;
 type MixinMergeStrategyFn = (mergeObject: object, mixinObject: object) => object;
 
 type CustomLevelLogger<CustomLevels extends string> = { [level in CustomLevels]: LogFn }
@@ -259,10 +259,11 @@ declare namespace pino {
 
     interface TransportPipelineOptions<TransportOptions = Record<string, any>> extends TransportBaseOptions<TransportOptions>{
         pipeline: TransportSingleOptions<TransportOptions>[]
+        level?: LevelWithSilentOrString
     }
 
     interface TransportMultiOptions<TransportOptions = Record<string, any>> extends TransportBaseOptions<TransportOptions>{
-        targets: readonly TransportTargetOptions<TransportOptions>[],
+        targets: readonly (TransportTargetOptions<TransportOptions>|TransportPipelineOptions<TransportOptions>)[],
         levels?: Record<string, number>
         dedupe?: boolean
     }
@@ -372,7 +373,7 @@ declare namespace pino {
          * is called. The function must synchronously return an object. The properties of the
          * returned object will be added to the logged JSON.
          */
-        mixin?: MixinFn;
+        mixin?: MixinFn<CustomLevels>;
 
         /**
          * If provided, the `mixinMergeStrategy` function is called each time one of the active
@@ -427,6 +428,17 @@ declare namespace pino {
              * pino.info('hi') // creates and logs {msg: 'hi', level: 30, time: <ts>}
              */
             asObject?: boolean;
+            formatters?: {
+                /**
+                 * Changes the shape of the log level.
+                 * The default shape is { level: number }.
+                 */
+                level?: (label: string, number: number) => object;
+                /**
+                 * Changes the shape of the log object.
+                 */
+                log?: (object: Record<string, unknown>) => Record<string, unknown>;
+            }
             /**
              * Instead of passing log messages to `console.log` they can be passed to a supplied function. If `write` is
              * set to a single function, all logging objects are passed to this function. If `write` is an object, it
